@@ -11,24 +11,28 @@ IMP_STEGER_WARMING = 8;
 AUSM_PLUS = 6;
 VAN_LEER = 7;
 ROE = 9;
+
 gamma = 1.4;
 
 % estipula o método
-METHOD = ROE;
+METHOD = IMP_STEGER_WARMING;
 
 % ordem do método
 order = 2;
 
+% razão entre as pressões em ambos os lados do diafragma
+pressureRatio = 5;
+
 scheme_name = "";
 switch (METHOD)
     case LAX_WENDROFF
-        scheme_name = "Lax-Wendroff";
+        scheme_name = "Second Order Lax-Wendroff";
     case MAC_COMARCK
-        scheme_name = "Mac Comarck";
+        scheme_name = "Second Order MacComarck";
     case EXP_BEAM_WARMING
-        scheme_name = "Explicit Beam-Warming";
+        scheme_name = "Second Order Explicit Beam-Warming";
     case IMP_BEAM_WARMING
-        scheme_name = "Implicit Beam-Warming";
+        scheme_name = "Second Order Implicit Beam-Warming";
     case EXP_STEGER_WARMING
          if order == 1
             scheme_name = "First Order Explicit Steger-Warming";
@@ -57,9 +61,6 @@ switch (METHOD)
         end   
 end
 
-% razão entre as pressões em ambos os lados do diafragma
-pressureRatio = 100;
-
 % constante dos gases ideais
 R = 287.052874;
 
@@ -77,15 +78,20 @@ rho_l = p_l / (R * T_l);
 
 % resolve de forma numérica
 [num_x, num_rho, num_u, num_E, num_p, totalTime] = solveShockProblem(METHOD, order, rho_l, u_l, ...
-                                    p_l, rho_r, u_r, p_r);
+                                   p_l, rho_r, u_r, p_r);
+
 
 % Create a table with the data and variable names
 T = table(num_x, num_rho, num_u, num_E, num_p, ones(length(num_x), 1) * totalTime, 'VariableNames', {'x', 'rho', 'u', 'E', 'p', 'time'});
 % Write data to text file
-writetable(T, strcat(scheme_name, '_', string(pressureRatio), '.txt'))
+if order == 1
+    writetable(T, strcat('First Order (Outputs)/', scheme_name, '_', string(pressureRatio), '.txt'));
+elseif order == 2
+    writetable(T, strcat('Second Order (Outputs)/', scheme_name, '_', string(pressureRatio), '.txt'))
+end
 
 % obtém solução analítica (razão 5)
-data = readmatrix(strcat('3000_d_pressure_ratio_', string(pressureRatio), '.txt'));
+data = readmatrix(strcat('Analytic Solution/3000_d_pressure_ratio_', string(pressureRatio), '.txt'));
 ana_x = data(:, 1);
 ana_rho = data(:, 2);
 ana_u = data(:, 3);
@@ -99,7 +105,7 @@ set(gcf, 'WindowState', 'maximized');
 subplot(2, 2, 1);
 plot(num_x, num_rho, 'r', 'LineWidth', 1);
 hold('on');
-plot(ana_x, ana_rho, 'b', 'LineWidth', 1);
+plot(ana_x, ana_rho, 'b--', 'LineWidth', 1);
 grid('on');
 axis('tight')
 xlabel('$x$', 'Interpreter', 'latex');
@@ -112,7 +118,7 @@ ax.FontSize = 16;
 subplot(2, 2, 2);
 plot(num_x, num_u, 'r', 'LineWidth', 1);
 hold('on');
-plot(ana_x, ana_u, 'b', 'LineWidth', 1);
+plot(ana_x, ana_u, 'b--', 'LineWidth', 1);
 grid('on');
 xlabel('$x$', 'Interpreter', 'latex');
 ylabel('$u(x, t)$', 'Interpreter', 'latex');
@@ -124,7 +130,7 @@ ax.FontSize = 16;
 subplot(2,2, 3);
 plot(num_x, num_p, 'r', 'LineWidth', 1);
 hold('on');
-plot(ana_x, ana_p, 'b', 'LineWidth', 1);
+plot(ana_x, ana_p, 'b--', 'LineWidth', 1);
 grid('on');
 xlabel('$x$', 'Interpreter', 'latex');
 ylabel('$p(x, t)$', 'Interpreter', 'latex');
@@ -136,7 +142,7 @@ ax.FontSize = 16;
 subplot(2,2, 4);
 plot(num_x, num_E, 'r', 'LineWidth', 1);
 hold('on');
-plot(ana_x, ana_E, 'b', 'LineWidth', 1);
+plot(ana_x, ana_E, 'b--', 'LineWidth', 1);
 grid('on');
 xlabel('$x$', 'Interpreter', 'latex');
 ylabel('$E(x, t)$', 'Interpreter', 'latex');

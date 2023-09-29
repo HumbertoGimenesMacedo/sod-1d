@@ -15,7 +15,7 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
     ROE = 9;
 
     % número de pontos interiores da malha
-    M = 2998;
+    M =2998;
     
     % comprimento do tubo
     L_ref = 1;
@@ -104,16 +104,17 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
 
             % determina o passo no tempo
             if order == 1
+                CFL = 0.3;
                 % determina o passo temporal
-                if ismember(pressureRatio, [5, 10])
-                    CFL = 0.3;
-                elseif pressureRatio == 20
-                    CFL = 0.1;
-                elseif pressureRatio == 50
-                    CFL = 0.05;
-                elseif pressureRatio == 100
-                    CFL = 0.01;
-                end
+                % if ismember(pressureRatio, [5, 10])
+                %     CFL = 0.3;
+                % elseif pressureRatio == 20
+                %     CFL = 0.1;
+                % elseif pressureRatio == 50
+                %     CFL = 0.05;
+                % elseif pressureRatio == 100
+                %     CFL = 0.3;%0.01;
+                % end
             elseif order == 2
                  % determina o passo temporal
                 if ismember(pressureRatio, [5, 10, 20])
@@ -140,7 +141,7 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
                 end
 
                 % mostra a solução corrente
-                %show(x, q, gamma);
+                show(x, q, gamma);
 
                 % matriz contendo a solução em cada instante de tempo
                 next_q = zeros(M + 2, 3);
@@ -214,7 +215,7 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
         case VAN_LEER
 
             % determina o passo no tempo
-            CFL = 0.1;
+            CFL = 0.3;
             eigenvalues = [u0, u0 + a0, u0 - a0];
             dt = CFL * dx / max(eigenvalues(:));
 
@@ -257,7 +258,7 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
                         F_bar_jphalf_minus = Fjp_minus;
                         F_bar_jmhalf_minus = Fj_minus;
                     elseif order == 2
-
+            
                         % calcula os valores do limitador
                         Z_plus_1 = fluxLimiter((rho(j + 1) - rho(j)) / (rho(j) - rho(j - 1)));
                         Z_minus_1 = fluxLimiter((rho(j + 1) - rho(j)) / (rho(j + 2) - rho(j + 1)));
@@ -437,14 +438,14 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
             F = @(q, lambda) A(q(2)/q(1), sqrt(gamma * (gamma - 1) * (q(3) ./ q(1) - q(2).^2 ./ (2 * q(1).^2))), lambda) * q';
 
             % determina o passo no tempo
-            if pressureRatio == 50 || pressureRatio == 100
-                CFL = 0.6;
-            else
-                CFL = 0.3;
-            end
-
+            % if pressureRatio == 50 || pressureRatio == 100
+            %     CFL = 0.6;
+            % else
+            %     CFL = 0.6;
+            % end
+            CFL = 0.6;
             eigenvalues = [u0, u0 + a0, u0 - a0];
-            dt =  CFL * dx / max(eigenvalues(:));
+            dt = CFL * dx / max(eigenvalues(:));
 
             % coeficiente do esquema numérico
             lamb = dt / dx;
@@ -461,7 +462,7 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
 
                 % efetua um incremento temporal
                 t = t + dt;
-
+       
                 if t * (L_ref / u_ref) > 1 
                     break
                 end
@@ -558,17 +559,18 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
 
         case EXP_STEGER_WARMING
 
-            % matriz jacobiana de fluxo em função dos autovalores
-            A = @(u, a, lambda) reshape([-lambda(1).*((1.0./a.^2.*u.^2.*(gamma-1.0))./2.0-1.0)-(1.0./a.^2.*lambda(2).*(a.*u-(u.^2.*(gamma-1.0))./2.0))./2.0+(1.0./a.^2.*lambda(3).*(a.*u+(u.^2.*(gamma-1.0))./2.0))./2.0,-lambda(1).*u.*((1.0./a.^2.*u.^2.*(gamma-1.0))./2.0-1.0)-lambda(2).*((1.0./a.^2.*u)./2.0+1.0./(a.*2.0)).*(a.*u-(u.^2.*(gamma-1.0))./2.0)+lambda(3).*((1.0./a.^2.*u)./2.0-1.0./(a.*2.0)).*(a.*u+(u.^2.*(gamma-1.0))./2.0),lambda(1).*u.^2.*((1.0./a.^2.*u.^2.*(gamma-1.0))./2.0-1.0).*(-1.0./2.0)-lambda(2).*(a.*u-(u.^2.*(gamma-1.0))./2.0).*(1.0./(gamma.*2.0-2.0)+u./(a.*2.0)+(1.0./a.^2.*u.^2)./4.0)+lambda(3).*(a.*u+(u.^2.*(gamma-1.0))./2.0).*(1.0./(gamma.*2.0-2.0)-u./(a.*2.0)+(1.0./a.^2.*u.^2)./4.0),(1.0./a.^2.*lambda(2).*(a-u.*(gamma-1.0)))./2.0-(1.0./a.^2.*lambda(3).*(a+u.*(gamma-1.0)))./2.0+1.0./a.^2.*lambda(1).*u.*(gamma-1.0),1.0./a.^2.*lambda(1).*u.^2.*(gamma-1.0)+(1.0./a.^2.*lambda(2).*(a+u).*(a+u-gamma.*u))./2.0+(1.0./a.^2.*lambda(3).*(a-u).*(a-u+gamma.*u))./2.0,lambda(2).*(a-u.*(gamma-1.0)).*(1.0./(gamma.*2.0-2.0)+u./(a.*2.0)+(1.0./a.^2.*u.^2)./4.0)-lambda(3).*(a+u.*(gamma-1.0)).*(1.0./(gamma.*2.0-2.0)-u./(a.*2.0)+(1.0./a.^2.*u.^2)./4.0)+(1.0./a.^2.*lambda(1).*u.^3.*(gamma-1.0))./2.0,(1.0./a.^2.*(gamma-1.0).*(lambda(1).*-2.0+lambda(2)+lambda(3)))./2.0,(1.0./a.^2.*(gamma-1.0).*(a.*lambda(2)-a.*lambda(3)-lambda(1).*u.*2.0+lambda(2).*u+lambda(3).*u))./2.0,lambda(2).*(gamma-1.0).*(1.0./(gamma.*2.0-2.0)+u./(a.*2.0)+(1.0./a.^2.*u.^2)./4.0)+lambda(3).*(gamma-1.0).*(1.0./(gamma.*2.0-2.0)-u./(a.*2.0)+(1.0./a.^2.*u.^2)./4.0)-(1.0./a.^2.*lambda(1).*u.^2.*(gamma-1.0))./2.0],[3,3]);
-            
-            % vetor de fluxo em função dos autovalores
-            F = @(q, lambda) A(q(2)/q(1), sqrt(gamma * (gamma - 1) * (q(3) ./ q(1) - q(2).^2 ./ (2 * q(1).^2))), lambda) * q';
-
             % determina o passo no tempo
             if order == 1
                 CFL = 0.3;
             elseif order == 2
-                CFL = 0.1;
+                 % determina o passo temporal
+                if ismember(pressureRatio, [5, 10, 20])
+                    CFL = 0.2;
+                elseif pressureRatio == 50
+                    CFL = 0.01;
+                elseif pressureRatio == 100
+                    CFL = 0.01;
+                end
             end
             eigenvalues = [u0, u0 + a0, u0 - a0];
             dt = CFL * dx / max(eigenvalues(:));
@@ -587,44 +589,74 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
                 
                 % mostra a solução corrente
                 %show(x, q, gamma);
-                
+
                 % matriz contendo a solução em cada instante de tempo
                 next_q = zeros(M + 2, 3);
                 
                 % calcula os três autovalores + e - em todos os 
                 % pontos da malha
-                u = q(:, 2) ./ q(:, 1);
-                a = sqrt(gamma * (gamma - 1) * (q(:, 3) ./ q(:, 1) - q(:, 2).^2 ./ (2 * q(:, 1).^2))); 
+               % rho = q(:, 1);
+               % u = q(:, 2) ./ rho;
+               % p = (gamma - 1) * (q(:, 3) - q(:, 2).^2 ./ (2 * q(:, 1)));
                 
-                lp = [u, u + a, u - a];
-                lm = lp;
-                
-                lp = max(lp, 0);
-                lm = min(lm, 0);
-
                 % calcula a solução no próximo instante de tempo
                 for j = 3:M
                     % verifica em qual ordem o esquema deve ser aplicado
                     if order == 1
-                        next_q(j, :) = q(j, :) - lamb  * (F(q(j, :), lp(j, :)) - F(q(j - 1, :), lp(j - 1, :)))' ...
-                                               - lamb  * (F(q(j + 1, :), lm(j + 1, :)) - F(q(j, :), lm(j, :)))';
+
+                        % calcula o vetor de fluxo numérico de Steger-Warming 
+                        % em três pontos consecutivos da malha
+                        [~, Fjm_plus] = stegerWarmingNumericFlux(q(j - 1, :), gamma);
+                        [Fj_minus, Fj_plus] = stegerWarmingNumericFlux(q(j , :), gamma);
+                        [Fjp_minus, ~] = stegerWarmingNumericFlux(q(j + 1, :), gamma);
+
+                        next_q(j, :) = q(j, :) - lamb * (Fj_plus - Fjm_plus)' ...
+                                               - lamb * (Fjp_minus - Fj_minus)';
+                       
                     elseif order == 2
+                        % 
+                        % % calcula os valores do limitador
+                        % Z_plus = [fluxLimiter((rho(j) - rho(j - 1)) / (rho(j + 1) - rho(j)));
+                        %           fluxLimiter((u(j) - u(j - 1)) / (u(j + 1) - u(j)));
+                        %           fluxLimiter((p(j) - p(j - 1)) / (p(j + 1) - p(j)))];
+                        % 
+                        % Z_minus = [fluxLimiter((rho(j + 1) - rho(j)) / (rho(j + 2) - rho(j + 1)));
+                        %            fluxLimiter((u(j + 1) - u(j)) / (u(j + 2) - u(j + 1)));
+                        %            fluxLimiter((p(j + 1) - p(j)) / (p(j + 2) - p(j + 1)))];
+                        % 
+                        % Z_plus(isnan(Z_plus)) = 1;
+                        % Z_minus(isnan(Z_minus)) = 1;
+
+                        % calcula o vetor de fluxo numérico de Steger-Warming 
+                        % em quatro pontos consecutivos da malha
+                        [~, Fjmm_plus] = stegerWarmingNumericFlux(q(j - 2, :), gamma);
+                        [Fjm_minus, Fjm_plus] = stegerWarmingNumericFlux(q(j - 1, :), gamma);
+                        [Fj_minus, Fj_plus] = stegerWarmingNumericFlux(q(j , :), gamma);
+                        [Fjp_minus, Fjp_plus] = stegerWarmingNumericFlux(q(j + 1, :), gamma);
+                        [Fjpp_minus, ~] = stegerWarmingNumericFlux(q(j + 2, :), gamma);
+
+
                         next_q_bar_jm = q(j - 1, :) ...
-                                   - lamb * (F(q(j - 1, :), lp(j - 1, :)) - F(q(j - 2, :), lp(j - 2, :)))' ...
-                                   - lamb * (F(q(j, :), lm(j, :)) - F(q(j - 1, :), lm(j - 1, :)))';
+                                   - lamb * (Fjm_plus - Fjmm_plus)' ...
+                                   - lamb * (Fj_minus - Fjm_minus)';
                     
                         next_q_bar_j = q(j, :) ...
-                                  - lamb * (F(q(j, :), lp(j, :)) - F(q(j - 1, :), lp(j - 1, :)))' ...
-                                  - lamb * (F(q(j + 1, :), lm(j + 1, :)) - F(q(j, :), lm(j, :)))';
+                                  - lamb * (Fj_plus - Fjm_plus)' ...
+                                  - lamb * (Fjp_minus - Fj_minus)';
                     
                         next_q_bar_jp = q(j + 1, :) ...
-                                  - lamb * (F(q(j + 1, :), lp(j + 1, :)) - F(q(j, :), lp(j, :)))' ...
-                                  - lamb * (F(q(j + 2, :), lm(j + 2, :)) - F(q(j + 1, :), lm(j + 1, :)))';
+                                  - lamb * (Fjp_plus - Fj_plus)' ...
+                                  - lamb * (Fjpp_minus - Fjp_minus)';
 
-                        
-                        next_q(j, :) = (q(j, :) + next_q_bar_j) / 2 ...
-                                     - lamb * (F(q(j, :), lp(j, :)) - 2 * F(q(j - 1, :), lp(j - 1, :)) + F(q(j - 2, :), lp(j - 2, :)) + F(next_q_bar_j, lp(j, :)) - F(next_q_bar_jm, lp(j - 1, :)))' / 2 ...
-                                     + lamb * (F(q(j + 2, :), lm(j + 2, :)) - 2 * F(q(j + 1, :), lm(j + 1, :)) + F(q(j, :), lm(j, :)) - (F(next_q_bar_jp, lm(j + 1, :)) - F(next_q_bar_j, lm(j, :))))' / 2;
+                      
+                        [~, Fjm_bar_plus] = stegerWarmingNumericFlux(next_q_bar_jm, gamma);
+                        [Fj_bar_minus, Fj_bar_plus] = stegerWarmingNumericFlux(next_q_bar_j, gamma);
+                        [Fjp_bar_minus, ~] = stegerWarmingNumericFlux(next_q_bar_jp, gamma);
+
+                         next_q(j, :) = q(j, :) - lamb * (Fj_plus - Fjm_plus)' ...
+                                                - lamb * (Fjp_minus - Fj_minus)' ...
+                                                + ( (-lamb *  (-Fjm_plus + Fjmm_plus + (Fj_bar_plus - Fjm_bar_plus)) / 2))' ...
+                                                + ( (lamb *  (Fjpp_minus - Fjp_minus - (Fjp_bar_minus - Fj_bar_minus))/ 2))' ;
                     end
                 end
 
