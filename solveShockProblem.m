@@ -13,10 +13,15 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
     VAN_LEER = 7;
     IMP_STEGER_WARMING = 8;
     ROE = 9;
+    HARTEN = 10;
+    IMP_HARTEN = 11;
 
     % número de pontos interiores da malha
-    M =2998;
-    
+    if METHOD == IMP_HARTEN
+        M = 1998;
+    else
+        M = 2998;
+    end
     % comprimento do tubo
     L_ref = 1;
     L = 2000 / L_ref;
@@ -97,6 +102,268 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
 
     switch(METHOD)
 
+        case IMP_HARTEN
+
+            % vetor de fluxo em função das variáveis conservadas
+            F = @(q) [q(2); ...
+                (3 - gamma) * q(2)^2/(2 * q(1)) + (gamma - 1) * q(3); ...
+                gamma * q(2) * q(3)/q(1) - (gamma - 1) * q(2)^3/(2 * q(1)^2)];
+
+            CFL = 0.05;
+            eigenvalues = [u0, u0 + a0, u0 - a0];
+            dt = CFL * dx / max(eigenvalues(:));
+
+            % coeficiente do esquema numérico
+            lamb = dt / dx;
+
+            epsValues = [0.2, 0, 0.2];
+
+            counter = 0;
+    
+            while 1
+
+                % efetua um incremento temporal
+                t = t + dt;
+                
+                time = t * (L_ref / u_ref);
+
+                if mod(counter, 10) == 0
+                    fprintf('Aguarde... (%.2f %% concluído)\n', time * 100);
+                end
+
+                if time > 1 
+                    break
+                end
+
+                % mostra a solução corrente
+                % show(x, q, gamma);
+               
+                % matriz contendo a solução em cada instante de tempo
+                next_q = zeros(M + 2, 3);
+     
+                % aloca as matrizes e vetores para os sistemas da versão
+                % implícita do esquema de Steger-Warming
+                B = zeros(3 * (M - 4), 3 * (M - 4));
+                f = zeros(3 * (M - 4), 1);
+                i = 1;
+                k = 1;
+
+                if order == 1
+
+                    for j = 4:M - 1
+                        % monta a matriz de coeficientes para o primeiro
+                        % sistema de equações lineares
+                        if j == 4
+                            E2 = eye(3) + lamb * (getJFirstOrder(q(j, :), q(j + 1, :), gamma, lamb, epsValues, 2) ...
+                                        + getJFirstOrder( q(j - 1, :), q(j, :), gamma, lamb, epsValues, 1));
+    
+                            E3 = - lamb * getJFirstOrder(q(j, :), q(j + 1, :),  gamma, lamb, epsValues, 2);
+                            B(1:3, 1:3) = E2;
+                            B(1:3, 4:6) = E3;
+                        elseif j == M - 1
+                             E1 = - lamb * getJFirstOrder(q(j - 1, :), q(j, :), gamma, lamb, epsValues, 1);
+                             E2 = eye(3) + lamb * (getJFirstOrder(q(j, :), q(j + 1, :), gamma, lamb, epsValues, 2) ...
+                                        + getJFirstOrder(q(j - 1, :), q(j, :), gamma, lamb, epsValues, 1));
+                             B(3*M - 14:3*M - 12, 3*M - 17:3*M - 15) = E1;
+                             B(3*M - 14:3*M - 12, 3*M - 14:3*M - 12) = E2;
+                             
+                        else
+                            E1 = - lamb * getJFirstOrder(q(j - 1, :), q(j, :), gamma, lamb, epsValues, 1);
+                            E2 = eye(3) + lamb * (getJFirstOrder(q(j, :), q(j + 1, :), gamma, lamb, epsValues, 2) ...
+                                        + getJFirstOrder(q(j - 1, :), q(j, :), gamma, lamb, epsValues, 1));
+                            E3 = - lamb * getJFirstOrder(q(j, :), q(j + 1, :), gamma, lamb, epsValues, 2);
+                            
+                            B(3 * (i - 1) + 1:3*i, (1:3) + 3 * (k - 1)) = E1;
+                            B(3 * (i - 1) + 1:3*i, (4:6) + 3 * (k - 1)) = E2;
+                            B(3 * (i - 1) + 1:3*i, (7:9) + 3 * (k - 1)) = E3;
+                            k = k + 1;
+                        end
+    
+                        FbarMjphalf = hartenFirstOrderNumericFluxImp(q(j, :), q(j + 1, :) , F(q(j, :)), F(q(j + 1, :)), gamma, lamb, epsValues);
+                        FbarMjmhalf = hartenFirstOrderNumericFluxImp(q(j - 1, :), q(j, :), F(q(j - 1, :)), F(q(j, :)), gamma, lamb, epsValues);
+    
+    
+                        f(3 * (i - 1) + 1:3*i) =  (FbarMjphalf - FbarMjmhalf);
+    
+                        i = i + 1;
+                    end
+
+
+                elseif order == 2
+
+                    for j = 4:M - 1
+                        % monta a matriz de coeficientes para o primeiro
+                        % sistema de equações lineares
+                        if j == 4
+                            E2 = eye(3) + lamb * (getJ(q(j - 1, :), q(j, :), q(j + 1, :), q(j + 2, :), gamma, lamb, epsValues, 2) ...
+                                        + getJ(q(j - 2, :), q(j - 1, :), q(j, :), q(j + 1, :), gamma, lamb, epsValues, 1));
+    
+                            E3 = - lamb * getJ(q(j - 1, :), q(j, :), q(j + 1, :), q(j + 2, :), gamma, lamb, epsValues, 2);
+                            B(1:3, 1:3) = E2;
+                            B(1:3, 4:6) = E3;
+                        elseif j == M - 1
+                             E1 = - lamb * getJ(q(j - 2, :), q(j - 1, :), q(j, :), q(j + 1, :), gamma, lamb, epsValues, 1);
+                             E2 = eye(3) + lamb * (getJ(q(j - 1, :), q(j, :), q(j + 1, :), q(j + 2, :), gamma, lamb, epsValues, 2) ...
+                                        + getJ(q(j - 2, :), q(j - 1, :), q(j, :), q(j + 1, :), gamma, lamb, epsValues, 1));
+                             B(3*M - 14:3*M - 12, 3*M - 17:3*M - 15) = E1;
+                             B(3*M - 14:3*M - 12, 3*M - 14:3*M - 12) = E2;
+                             
+                        else
+                            E1 = - lamb * getJ(q(j - 2, :), q(j - 1, :), q(j, :), q(j + 1, :), gamma, lamb, epsValues, 1);
+                            E2 = eye(3) + lamb * (getJ(q(j - 1, :), q(j, :), q(j + 1, :), q(j + 2, :), gamma, lamb, epsValues, 2) ...
+                                        + getJ(q(j - 2, :), q(j - 1, :), q(j, :), q(j + 1, :), gamma, lamb, epsValues, 1));
+                            E3 = - lamb * getJ(q(j - 1, :), q(j, :), q(j + 1, :), q(j + 2, :), gamma, lamb, epsValues, 2);
+                            
+                            B(3 * (i - 1) + 1:3*i, (1:3) + 3 * (k - 1)) = E1;
+                            B(3 * (i - 1) + 1:3*i, (4:6) + 3 * (k - 1)) = E2;
+                            B(3 * (i - 1) + 1:3*i, (7:9) + 3 * (k - 1)) = E3;
+                            k = k + 1;
+                        end
+    
+                        FbarMjphalf = hartenSecondOrderNumericFluxImp(q(j - 1, :),q(j, :), q(j + 1, :), q(j + 2, :) , F(q(j, :)), F(q(j + 1, :)), gamma, lamb, epsValues);
+                        FbarMjmhalf = hartenSecondOrderNumericFluxImp(q(j - 2, :), q(j - 1, :), q(j, :), q(j + 1, :), F(q(j - 1, :)), F(q(j, :)), gamma, lamb, epsValues);
+    
+    
+                        f(3 * (i - 1) + 1:3*i) =  (FbarMjphalf - FbarMjmhalf);
+    
+                        i = i + 1;
+                    end
+                end
+                % monta o vetor do lado direito para o primeiro sistema
+                % de equações lineares
+                f =  -lamb * f;
+
+                % resolve o segundo sistema
+                dq = linsolve(B, f);
+
+                % atualiza a solução corrente
+                for j = 4:M - 1
+                    indexes = 3 * (j - 4) + 1:3 * (j - 3);
+                    next_q(j, :) = q(j, :) + dq(indexes(1):indexes(3))';
+                end
+
+                % aplica as condições de contorno à esquerda
+                next_q(1, 1) = rho_l; % densidade
+                next_q(1, 2) = rho_l * u_l; % quantidade de movimento na direção x
+                next_q(1, 3) = p_l / (gamma - 1) + rho_l * u_l^2 / 2; % energia total
+        
+                next_q(2, 1) = rho_l; % densidade
+                next_q(2, 2) = rho_l * u_l; % quantidade de movimento na direção x
+                next_q(2, 3) = p_l / (gamma - 1) + rho_l * u_l^2 / 2; % energia total
+
+                next_q(3, 1) = rho_l; % densidade
+                next_q(3, 2) = rho_l * u_l; % quantidade de movimento na direção x
+                next_q(3, 3) = p_l / (gamma - 1) + rho_l * u_l^2 / 2; % energia total
+
+                % aplica as condições de contorno à direita
+                next_q(M, 1) = rho_r; % densidade
+                next_q(M, 2) = rho_r * u_r; % quantidade de movimento na direção x
+                next_q(M, 3) = p_r / (gamma - 1) + rho_r * u_r^2 / 2; % energia total
+        
+                % aplica as condições de contorno à direita
+                next_q(M + 1, 1) = rho_r; % densidade
+                next_q(M + 1, 2) = rho_r * u_r; % quantidade de movimento na direção x
+                next_q(M + 1, 3) = p_r / (gamma - 1) + rho_r * u_r^2 / 2; % energia total
+            
+                next_q(M + 2, 1) = rho_r; % densidade
+                next_q(M + 2, 2) = rho_r * u_r; % quantidade de movimento na direção x
+                next_q(M + 2, 3) = p_r / (gamma - 1) + rho_r * u_r^2 / 2; % energia total
+    
+                % a solução no próximo instante se torna a solução corrente
+                q = next_q;
+
+                counter = counter + 1;
+            end
+
+
+        case HARTEN
+            % vetor de fluxo em função das variáveis conservadas
+            F = @(q) [q(2); ...
+                (3 - gamma) * q(2)^2/(2 * q(1)) + (gamma - 1) * q(3); ...
+                gamma * q(2) * q(3)/q(1) - (gamma - 1) * q(2)^3/(2 * q(1)^2)];
+
+            epsValues = [0.2; 0; 0.2];
+            CFL = 0.3;
+            eigenvalues = [u0, u0 + a0, u0 - a0];
+            dt = CFL * dx / max(eigenvalues(:));
+
+            % coeficiente do esquema numérico
+            lamb = dt / dx;
+
+            counter = 0;
+
+            while 1
+
+                % efetua um incremento temporal
+                t = t + dt;
+
+                time = t * (L_ref / u_ref);
+
+                % if mod(counter, 10) == 0
+                %     fprintf('Aguarde... (%.2f %% concluído)\n', time * 100);
+                % end
+   
+                if time > 1 
+                    break
+                end
+
+                % mostra a solução corrente
+                % show(x, q, gamma);
+
+                % matriz contendo a solução em cada instante de tempo
+                next_q = zeros(M + 2, 3);
+
+                % calcula a solução no próximo instante de tempo
+                for j = 4:M-1
+                    if order == 1
+                        % calcula o fluxo numérico de Liou na interface j + 1/2
+                        FbarMjphalf = hartenNumericFlux(q(j, :), q(j + 1, :), ...
+                            F(q(j, :)), F(q(j + 1, :)), gamma, lamb, epsValues);
+                         % calcula o fluxo numérico de Liou na interface j - 1/2
+                        FbarMjmhalf = hartenNumericFlux(q(j - 1, :), q(j, :), ...
+                            F(q(j - 1, :)), F(q(j, :)), gamma, lamb, epsValues);
+                        
+                    elseif order == 2
+
+                        FbarMjphalf = hartenSecondOrderNumericFlux(q(j - 1, :), q(j, :), q(j + 1, :), q(j + 2, :) , F(q(j, :)), F(q(j + 1, :)), gamma, lamb, epsValues);
+                        FbarMjmhalf = hartenSecondOrderNumericFlux(q(j - 2, :), q(j - 1, :), q(j, :), q(j + 1, :), F(q(j - 1, :)), F(q(j, :)), gamma, lamb, epsValues);
+                    end
+
+                    next_q(j, :) = q(j, :) - lamb * (FbarMjphalf - FbarMjmhalf)';
+                end
+
+                % aplica as condições de contorno à esquerda
+                next_q(1, 1) = rho_l; % densidade
+                next_q(1, 2) = rho_l * u_l; % quantidade de movimento na direção x
+                next_q(1, 3) = p_l / (gamma - 1) + rho_l * u_l^2 / 2; % energia total
+        
+                next_q(2, 1) = rho_l; % densidade
+                next_q(2, 2) = rho_l * u_l; % quantidade de movimento na direção x
+                next_q(2, 3) = p_l / (gamma - 1) + rho_l * u_l^2 / 2; % energia total
+
+                next_q(3, 1) = rho_l; % densidade
+                next_q(3, 2) = rho_l * u_l; % quantidade de movimento na direção x
+                next_q(3, 3) = p_l / (gamma - 1) + rho_l * u_l^2 / 2; % energia total
+
+                % aplica as condições de contorno à direita
+                next_q(M, 1) = rho_r; % densidade
+                next_q(M, 2) = rho_r * u_r; % quantidade de movimento na direção x
+                next_q(M, 3) = p_r / (gamma - 1) + rho_r * u_r^2 / 2; % energia total
+        
+                % aplica as condições de contorno à direita
+                next_q(M + 1, 1) = rho_r; % densidade
+                next_q(M + 1, 2) = rho_r * u_r; % quantidade de movimento na direção x
+                next_q(M + 1, 3) = p_r / (gamma - 1) + rho_r * u_r^2 / 2; % energia total
+            
+                next_q(M + 2, 1) = rho_r; % densidade
+                next_q(M + 2, 2) = rho_r * u_r; % quantidade de movimento na direção x
+                next_q(M + 2, 3) = p_r / (gamma - 1) + rho_r * u_r^2 / 2; % energia total
+        
+                % a solução no próximo instante se torna a solução corrente
+                q = next_q;
+
+              %  counter = counter + 1;
+            end
         case ROE
 
             % entalpia total
@@ -468,7 +735,7 @@ function [x, rho, u, E, p, totalTime] = solveShockProblem(METHOD, order, rho_l, 
                 end
 
                 % mostra a solução corrente
-                %show(x, q, gamma);
+                show(x, q, gamma);
                
                 % matriz contendo a solução em cada instante de tempo
                 next_q = zeros(M + 2, 3);
